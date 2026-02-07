@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Запись на приём</title>
+</head>
+<body>
+
+<h2>Запись на приём</h2>
+
+<label>Дата:</label><br>
+<input type="date" id="date"><br><br>
+
+<label>Время:</label><br>
+<select id="time">
+  <option value="">Сначала выберите дату</option>
+</select><br><br>
+
+<label>Имя:</label><br>
+<input id="name"><br><br>
+
+<label>Телефон:</label><br>
+<input id="phone" placeholder="+7700..."><br><br>
+
+<button id="btn">Записаться</button>
+
+<p id="msg"></p>
+
+<script>
+const API = "https://script.google.com/macros/s/AKfycbzW8qdF5cfsA9sPPTJj9iG5ekKPPgV15F28DXgEuqe3zxII5MsYIbyXNllJp-1r4kI/exec";
+
+const TIMES = [
+  "09:00","09:30","10:00","10:30",
+  "11:00","11:30","12:00","12:30",
+  "14:00","14:30","15:00","15:30",
+  "16:00","16:30","17:00"
+];
+
+const dateEl = document.getElementById("date");
+const timeEl = document.getElementById("time");
+const nameEl = document.getElementById("name");
+const phoneEl = document.getElementById("phone");
+const msgEl  = document.getElementById("msg");
+const btnEl  = document.getElementById("btn");
+
+// 0=вс, 6=сб
+function isWeekend(yyyy_mm_dd){
+  const d = new Date(yyyy_mm_dd + "T00:00:00");
+  const day = d.getDay();
+  return day === 0 || day === 6;
+}
+
+// 1) ЖЁСТКО: как только выбрали выходной — очищаем дату
+dateEl.addEventListener("change", () => {
+  if (!dateEl.value) return;
+
+  if (isWeekend(dateEl.value)) {
+    msgEl.textContent = "Выходной день. Выберите будний день.";
+    dateEl.value = "";
+    timeEl.innerHTML = "<option value=''>Сначала выберите дату</option>";
+    return;
+  }
+
+  loadTimes();
+});
+
+btnEl.addEventListener("click", book);
+
+function loadTimes() {
+  const date = dateEl.value;
+  msgEl.textContent = "";
+
+  // 2) ДУБЛЬ защита: даже если как-то попал выходной — не показываем время
+  if (!date) {
+    timeEl.innerHTML = "<option value=''>Сначала выберите дату</option>";
+    return;
+  }
+  if (isWeekend(date)) {
+    msgEl.textContent = "Выходной день. Выберите будний день.";
+    dateEl.value = "";
+    timeEl.innerHTML = "<option value=''>Сначала выберите дату</option>";
+    return;
+  }
+
+  timeEl.innerHTML = "<option>Загрузка...</option>";
+
+  fetch(`${API}?action=busy&date=${encodeURIComponent(date)}`)
+    .then(r => r.text())
+    .then(txt => JSON.parse(txt))
+    .then(data => {
+      const busy = (data.busy || []).map(x => String(x).trim());
+      timeEl.innerHTML = "";
+
+      TIMES.forEach(t => {
+        if (!busy.includes(t)) {
+          const o = document.createElement("option");
+          o.value = t;
+          o.textContent = t;
+          timeEl.appendChild(o);
+        }
+      });
+
+      if (!timeEl.options.length) {
+        timeEl.innerHTML = "<option value=''>Нет свободного времени</option>";
+      }
+    })
+    .catch(() => {
+      timeEl.innerHTML = "<option value=''>Ошибка загрузки</option>";
+    });
+}
+
+function book() {
+  const date = dateEl.value;
+  const time = timeEl.value;
+  const name = nameEl.value.trim();
+  const phone = phoneEl.value.trim();
+
+  // 3) ЖЁСТКО: не даём записаться на выходной НИ ПРИ КАКИХ условиях
+  if (!date) { msgEl.textContent = "Выберите дату."; return; }
+  if (isWeekend(date)) { msgEl.textContent = "Выходной день. Выберите будний день."; return; }
+  if (!time) { msgEl.textContent = "Выберите время."; return; }
+  if (!name || !phone) { msgEl.textContent = "Введите имя и телефон."; return; }
+
+  btnEl.disabled = true;
+  msgEl.textContent = "Записываю...";
+
+  const url =
+    API +
+    "?action=book" +
+    "&date=" + encodeURIComponent(date) +
+    "&time=" + encodeURIComponent(time) +
+    "&name=" + encodeURIComponent(name) +
+    "&phone=" + encodeURIComponent(phone);
+
+  fetch(url)
+    .then(r => r.text())
+    .then(txt => JSON.parse(txt))
+    .then(res => {
+      if (res.ok) {
+        msgEl.textContent = "✅ Запись сохранена";
+        loadTimes(); // слот исчезает сразу
+      } else if (res.error === "SLOT_BUSY") {
+        msgEl.textContent = "⛔ Это время уже занято";
+        loadTimes();
+      } else {
+        msgEl.textContent = "❌ Ошибка";
+      }
+    })
+    .catch(() => {
+      msgEl.textContent = "❌ Ошибка связи";
+    })
+    .finally(() => {
+      btnEl.disabled = false;
+    });
+}
+</script>
+
+</body>
+</html>
