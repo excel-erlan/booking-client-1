@@ -4,13 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Запись на приём</title>
- <style>
+  <style>
     body{
-           background: url("bg.png") center/cover no-repeat fixed;
-      color: white;   
+      background: url("bg.png") center/cover no-repeat fixed;
+      color: white;
+      font-family: Arial, sans-serif;
     }
+    input, select, button{
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.3);
+      margin: 6px 0;
+      width: min(360px, 92vw);
+      box-sizing: border-box;
+    }
+    button{ cursor: pointer; }
   </style>
-
 </head>
 <body>
 
@@ -58,7 +67,6 @@ function isWeekend(yyyy_mm_dd){
   return day === 0 || day === 6;
 }
 
-// 1) ЖЁСТКО: как только выбрали выходной — очищаем дату
 dateEl.addEventListener("change", () => {
   if (!dateEl.value) return;
 
@@ -78,7 +86,6 @@ function loadTimes() {
   const date = dateEl.value;
   msgEl.textContent = "";
 
-  // 2) ДУБЛЬ защита: даже если как-то попал выходной — не показываем время
   if (!date) {
     timeEl.innerHTML = "<option value=''>Сначала выберите дату</option>";
     return;
@@ -117,13 +124,26 @@ function loadTimes() {
     });
 }
 
-function book() {
+async function fetchWithTimeout(url, ms = 12000){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try{
+    const r = await fetch(url, { signal: controller.signal });
+    const txt = await r.text();
+    return { ok: r.ok, status: r.status, txt };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function book() {
   const date = dateEl.value;
   const time = timeEl.value;
   const name = nameEl.value.trim();
-  const phone = phoneEl.value.trim();
 
-  // 3) ЖЁСТКО: не даём записаться на выходной НИ ПРИ КАКИХ условиях
+  // телефон: оставляем цифры и +, убираем пробелы/скобки/дефисы
+  const phone = phoneEl.value.trim().replace(/[^\d+]/g, "");
+
   if (!date) { msgEl.textContent = "Выберите дату."; return; }
   if (isWeekend(date)) { msgEl.textContent = "Выходной день. Выберите будний день."; return; }
   if (!time) { msgEl.textContent = "Выберите время."; return; }
@@ -140,49 +160,37 @@ function book() {
     "&name=" + encodeURIComponent(name) +
     "&phone=" + encodeURIComponent(phone);
 
-  fetch(url)
-    .then(r => r.text())
-    .then(txt => JSON.parse(txt))
-    .then(res => {
-      if (res.ok) {
-        msgEl.textContent = "✅ Запись сохранена";
-        loadTimes(); // слот исчезает сразу
-      } else if (res.error === "SLOT_BUSY") {
-        msgEl.textContent = "⛔ Это время уже занято";
-        loadTimes();
-      } else {
-        msgEl.textContent = "❌ Ошибка";
-      }
-    })
-    .catch(() => {
-      msgEl.textContent = "❌ Ошибка связи";
-    })
-    .finally(() => {
-      btnEl.disabled = false;
-    });
+  try{
+    const { ok, status, txt } = await fetchWithTimeout(url, 12000);
+
+    let res;
+    try{
+      res = JSON.parse(txt);
+    } catch(e){
+      // если сервер вернул не JSON (HTML-ошибка/доступ/редирект)
+      msgEl.textContent = "❌ Сервер вернул не-JSON (status " + status + "): " + txt.slice(0, 120);
+      return;
+    }
+
+    if (res.ok) {
+      msgEl.textContent = "✅ Запись сохранена";
+      loadTimes();
+    } else if (res.error === "SLOT_BUSY") {
+      msgEl.textContent = "⛔ Это время уже занято";
+      loadTimes();
+    } else {
+      msgEl.textContent = "❌ Ошибка: " + (res.error || "UNKNOWN");
+    }
+
+  } catch(e){
+    msgEl.textContent = (e.name === "AbortError")
+      ? "⏳ Сервер долго отвечает (таймаут). Проверь Apps Script."
+      : "❌ Ошибка связи: " + e.message;
+  } finally {
+    btnEl.disabled = false;
+  }
 }
 </script>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
