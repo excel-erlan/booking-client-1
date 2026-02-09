@@ -132,13 +132,17 @@ function book() {
 
 
 
+
+  
   
   function cancelBooking(){
   const date = document.getElementById("date").value;
   const phone = document.getElementById("phone").value.replace(/\s+/g,"");
+  const msg = document.getElementById("msg"); // берём прямо по id, без msgEl
 
   if(!date || !phone){
-    msgEl.textContent = "Введите дату и телефон для отмены";
+    if (msg) msg.textContent = "Введите дату и телефон для отмены";
+    alert("Введите дату и телефон для отмены");
     return;
   }
 
@@ -149,19 +153,23 @@ function book() {
     "&phone=" + encodeURIComponent(phone);
 
   fetch(url)
-    .then(r => r.json())
+    .then(r => r.text())
+    .then(t => JSON.parse(t))
     .then(res => {
       if (res.ok) {
-        msgEl.textContent = "❌ Запись отменена";
-        loadTimes(); // время снова появится
+        if (msg) msg.textContent = "❌ Запись отменена";
+        loadTimes();
       } else {
-        msgEl.textContent = "Запись не найдена";
+        if (msg) msg.textContent = "Запись не найдена (проверь дату/телефон)";
+        alert("Запись не найдена (проверь дату/телефон)");
       }
     })
-    .catch(() => {
-      msgEl.textContent = "❌ Ошибка связи";
+    .catch(err => {
+      if (msg) msg.textContent = "❌ Ошибка связи";
+      alert("Ошибка связи");
     });
 }
+
 
 
 
@@ -205,6 +213,7 @@ function book() {
 </body>
 
 </html>
+
 
 
 
