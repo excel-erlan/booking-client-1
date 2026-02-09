@@ -130,6 +130,40 @@ function book() {
   if (!time) { msgEl.textContent = "Выберите время."; return; }
   if (!name || !phone) { msgEl.textContent = "Введите имя и телефон."; return; }
 
+  function cancelBooking(){
+  const date = document.getElementById("date").value;
+  const time = document.getElementById("time").value;
+  const phone = document.getElementById("phone").value.replace(/\s+/g,"");
+
+  if(!date || !time || !phone){
+    msgEl.textContent = "Введите дату, время и телефон для отмены";
+    return;
+  }
+
+  const url =
+    API +
+    "?action=cancel" +
+    "&date=" + encodeURIComponent(date) +
+    "&time=" + encodeURIComponent(time) +
+    "&phone=" + encodeURIComponent(phone);
+
+  fetch(url)
+    .then(r => r.text())
+    .then(t => JSON.parse(t))
+    .then(res => {
+      if (res.ok) {
+        msgEl.textContent = "❌ Запись отменена";
+        loadTimes();
+      } else {
+        msgEl.textContent = "Не найдено (проверь дату/время/телефон)";
+      }
+    })
+    .catch(() => {
+      msgEl.textContent = "❌ Ошибка связи";
+    });
+}
+
+
   btnEl.disabled = true;
   msgEl.textContent = "Записываю...";
 
@@ -167,6 +201,7 @@ function book() {
 </body>
 
 </html>
+
 
 
 
