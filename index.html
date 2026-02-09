@@ -30,8 +30,9 @@
 <label>Телефон:</label><br>
 <input id="phone" placeholder="+7700..."><br><br>
 
-<button id="btn" type="button" onclick="book()">Записаться</button>
-<button type="button" onclick="cancelBooking()">Отменить запись</button>
+<button id="btn" type="button">Записаться</button>
+<button id="cancelBtn" type="button">Отменить запись</button>
+
 
 
 
@@ -76,6 +77,9 @@ dateEl.addEventListener("change", () => {
 });
 
 btnEl.addEventListener("click", book);
+const cancelBtnEl = document.getElementById("cancelBtn");
+cancelBtnEl.addEventListener("click", cancelBooking);
+
 
 function loadTimes() {
   const date = dateEl.value;
@@ -137,14 +141,12 @@ function book() {
 
   
   
-  function cancelBooking(){
-  const date = document.getElementById("date").value;
-  const phone = document.getElementById("phone").value.replace(/\s+/g,"");
-  const msg = document.getElementById("msg"); // берём прямо по id, без msgEl
+ function cancelBooking(){
+  const date = dateEl.value;
+  const phone = phoneEl.value.replace(/\s+/g,"");
 
   if(!date || !phone){
-    if (msg) msg.textContent = "Введите дату и телефон для отмены";
-    alert("Введите дату и телефон для отмены");
+    msgEl.textContent = "Введите дату и телефон для отмены";
     return;
   }
 
@@ -154,23 +156,24 @@ function book() {
     "&date=" + encodeURIComponent(date) +
     "&phone=" + encodeURIComponent(phone);
 
+  msgEl.textContent = "Отменяю...";
+
   fetch(url)
     .then(r => r.text())
     .then(t => JSON.parse(t))
     .then(res => {
       if (res.ok) {
-        if (msg) msg.textContent = "❌ Запись отменена";
+        msgEl.textContent = "❌ Запись отменена";
         loadTimes();
       } else {
-        if (msg) msg.textContent = "Запись не найдена (проверь дату/телефон)";
-        alert("Запись не найдена (проверь дату/телефон)");
+        msgEl.textContent = "Запись не найдена (проверь дату/телефон)";
       }
     })
-    .catch(err => {
-      if (msg) msg.textContent = "❌ Ошибка связи";
-      alert("Ошибка связи");
+    .catch(() => {
+      msgEl.textContent = "❌ Ошибка связи";
     });
 }
+
 
 
 
@@ -215,6 +218,7 @@ function book() {
 </body>
 
 </html>
+
 
 
 
