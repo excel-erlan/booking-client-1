@@ -19,6 +19,8 @@
       box-sizing: border-box;
     }
     button{ cursor: pointer; }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; }
+    .row button{ width: min(175px, calc(46vw - 10px)); }
   </style>
 </head>
 <body>
@@ -39,7 +41,10 @@
 <label>Телефон:</label><br>
 <input id="phone" placeholder="+7700..."><br><br>
 
-<button id="btn">Записаться</button>
+<div class="row">
+  <button id="btn">Записаться</button>
+  <button id="btnCancel" type="button">Отменить запись</button>
+</div>
 
 <p id="msg"></p>
 
@@ -59,6 +64,7 @@ const nameEl = document.getElementById("name");
 const phoneEl = document.getElementById("phone");
 const msgEl  = document.getElementById("msg");
 const btnEl  = document.getElementById("btn");
+const btnCancelEl = document.getElementById("btnCancel");
 
 // 0=вс, 6=сб
 function isWeekend(yyyy_mm_dd){
@@ -81,6 +87,7 @@ dateEl.addEventListener("change", () => {
 });
 
 btnEl.addEventListener("click", book);
+btnCancelEl.addEventListener("click", cancelBooking);
 
 function loadTimes() {
   const date = dateEl.value;
@@ -136,13 +143,16 @@ async function fetchWithTimeout(url, ms = 12000){
   }
 }
 
+function normalizePhone(raw){
+  // оставляем цифры и +, убираем пробелы/скобки/дефисы
+  return String(raw || "").trim().replace(/[^\d+]/g, "");
+}
+
 async function book() {
   const date = dateEl.value;
   const time = timeEl.value;
   const name = nameEl.value.trim();
-
-  // телефон: оставляем цифры и +, убираем пробелы/скобки/дефисы
-  const phone = phoneEl.value.trim().replace(/[^\d+]/g, "");
+  const phone = normalizePhone(phoneEl.value);
 
   if (!date) { msgEl.textContent = "Выберите дату."; return; }
   if (isWeekend(date)) { msgEl.textContent = "Выходной день. Выберите будний день."; return; }
@@ -150,6 +160,7 @@ async function book() {
   if (!name || !phone) { msgEl.textContent = "Введите имя и телефон."; return; }
 
   btnEl.disabled = true;
+  btnCancelEl.disabled = true;
   msgEl.textContent = "Записываю...";
 
   const url =
@@ -161,13 +172,12 @@ async function book() {
     "&phone=" + encodeURIComponent(phone);
 
   try{
-    const { ok, status, txt } = await fetchWithTimeout(url, 12000);
+    const { status, txt } = await fetchWithTimeout(url, 12000);
 
     let res;
     try{
       res = JSON.parse(txt);
     } catch(e){
-      // если сервер вернул не JSON (HTML-ошибка/доступ/редирект)
       msgEl.textContent = "❌ Сервер вернул не-JSON (status " + status + "): " + txt.slice(0, 120);
       return;
     }
@@ -188,6 +198,58 @@ async function book() {
       : "❌ Ошибка связи: " + e.message;
   } finally {
     btnEl.disabled = false;
+    btnCancelEl.disabled = false;
+  }
+}
+
+async function cancelBooking() {
+  const date = dateEl.value;
+  const phone = normalizePhone(phoneEl.value);
+
+  if (!date) { msgEl.textContent = "Выберите дату."; return; }
+  if (isWeekend(date)) { msgEl.textContent = "Выходной день. Выберите будний день."; return; }
+  if (!phone) { msgEl.textContent = "Введите телефон."; return; }
+
+  if (!confirm(`Отменить запись на ${date} для телефона ${phone}?`)) return;
+
+  btnEl.disabled = true;
+  btnCancelEl.disabled = true;
+  msgEl.textContent = "Отменяю запись...";
+
+  const url =
+    API +
+    "?action=cancel" +
+    "&date=" + encodeURIComponent(date) +
+    "&phone=" + encodeURIComponent(phone);
+
+  try{
+    const { status, txt } = await fetchWithTimeout(url, 12000);
+
+    let res;
+    try{
+      res = JSON.parse(txt);
+    } catch(e){
+      msgEl.textContent = "❌ Сервер вернул не-JSON (status " + status + "): " + txt.slice(0, 120);
+      return;
+    }
+
+    if (res.ok) {
+      msgEl.textContent = "✅ Запись отменена";
+      loadTimes();
+    } else if (res.error === "NOT_FOUND") {
+      msgEl.textContent = "⛔ Запись не найдена (проверь дату и телефон)";
+      loadTimes();
+    } else {
+      msgEl.textContent = "❌ Ошибка: " + (res.error || "UNKNOWN");
+    }
+
+  } catch(e){
+    msgEl.textContent = (e.name === "AbortError")
+      ? "⏳ Сервер долго отвечает (таймаут). Проверь Apps Script."
+      : "❌ Ошибка связи: " + e.message;
+  } finally {
+    btnEl.disabled = false;
+    btnCancelEl.disabled = false;
   }
 }
 </script>
