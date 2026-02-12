@@ -6,7 +6,7 @@
   <title>Запись на приём</title>
   <style>
     body{
-      background: url("bg5.png") center/cover no-repeat fixed;
+      background: url("bg.png") center/cover no-repeat fixed;
       color: white;
       font-family: Arial, sans-serif;
     }
@@ -38,11 +38,14 @@
 <label>Имя:</label><br>
 <input id="name"><br><br>
 
+<label>Мастер:</label><br>
+<input id="master" placeholder="Напр. Ержан"><br><br>
+
 <label>Телефон:</label><br>
 <input id="phone" placeholder="+7700..."><br><br>
 
 <div class="row">
-  <button id="btn">Записаться</button>
+  <button id="btn" type="button">Записаться</button>
   <button id="btnCancel" type="button">Отменить запись</button>
 </div>
 
@@ -61,6 +64,7 @@ const TIMES = [
 const dateEl = document.getElementById("date");
 const timeEl = document.getElementById("time");
 const nameEl = document.getElementById("name");
+const masterEl = document.getElementById("master");
 const phoneEl = document.getElementById("phone");
 const msgEl  = document.getElementById("msg");
 const btnEl  = document.getElementById("btn");
@@ -82,7 +86,6 @@ dateEl.addEventListener("change", () => {
     timeEl.innerHTML = "<option value=''>Сначала выберите дату</option>";
     return;
   }
-
   loadTimes();
 });
 
@@ -143,21 +146,24 @@ async function fetchWithTimeout(url, ms = 12000){
   }
 }
 
-function normalizePhone(raw){
-  // оставляем цифры и +, убираем пробелы/скобки/дефисы
-  return String(raw || "").trim().replace(/[^\d+]/g, "");
+function normalizePhoneDigits(raw){
+  // только цифры — чтобы +7, пробелы, скобки не мешали
+  return String(raw || "").trim().replace(/[^\d]/g, "");
 }
 
 async function book() {
   const date = dateEl.value;
   const time = timeEl.value;
   const name = nameEl.value.trim();
-  const phone = normalizePhone(phoneEl.value);
+  const master = masterEl.value.trim();
+  const phone = normalizePhoneDigits(phoneEl.value);
 
   if (!date) { msgEl.textContent = "Выберите дату."; return; }
   if (isWeekend(date)) { msgEl.textContent = "Выходной день. Выберите будний день."; return; }
   if (!time) { msgEl.textContent = "Выберите время."; return; }
-  if (!name || !phone) { msgEl.textContent = "Введите имя и телефон."; return; }
+  if (!name) { msgEl.textContent = "Введите имя."; return; }
+  if (!master) { msgEl.textContent = "Введите имя мастера."; return; }
+  if (!phone) { msgEl.textContent = "Введите телефон."; return; }
 
   btnEl.disabled = true;
   btnCancelEl.disabled = true;
@@ -169,15 +175,15 @@ async function book() {
     "&date=" + encodeURIComponent(date) +
     "&time=" + encodeURIComponent(time) +
     "&name=" + encodeURIComponent(name) +
-    "&phone=" + encodeURIComponent(phone);
+    "&phone=" + encodeURIComponent(phone) +
+    "&master=" + encodeURIComponent(master);
 
   try{
     const { status, txt } = await fetchWithTimeout(url, 12000);
 
     let res;
-    try{
-      res = JSON.parse(txt);
-    } catch(e){
+    try { res = JSON.parse(txt); }
+    catch {
       msgEl.textContent = "❌ Сервер вернул не-JSON (status " + status + "): " + txt.slice(0, 120);
       return;
     }
@@ -204,7 +210,7 @@ async function book() {
 
 async function cancelBooking() {
   const date = dateEl.value;
-  const phone = normalizePhone(phoneEl.value);
+  const phone = normalizePhoneDigits(phoneEl.value);
 
   if (!date) { msgEl.textContent = "Выберите дату."; return; }
   if (isWeekend(date)) { msgEl.textContent = "Выходной день. Выберите будний день."; return; }
@@ -226,9 +232,8 @@ async function cancelBooking() {
     const { status, txt } = await fetchWithTimeout(url, 12000);
 
     let res;
-    try{
-      res = JSON.parse(txt);
-    } catch(e){
+    try { res = JSON.parse(txt); }
+    catch {
       msgEl.textContent = "❌ Сервер вернул не-JSON (status " + status + "): " + txt.slice(0, 120);
       return;
     }
@@ -256,7 +261,3 @@ async function cancelBooking() {
 
 </body>
 </html>
-
-
-
-
