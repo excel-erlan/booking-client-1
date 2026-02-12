@@ -1,288 +1,94 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Запись на приём</title>
-  <style>
-    body{
-      background: url("bg.png") center/cover no-repeat fixed;
-      color: white;
-      font-family: Arial, sans-serif;
-    }
-    input, select, button{
-      padding: 10px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.3);
-      margin: 6px 0;
-      width: min(360px, 92vw);
-      box-sizing: border-box;
-    }
-    button{ cursor: pointer; }
-    .row{ display:flex; gap:10px; flex-wrap:wrap; }
-    .row button{ width: min(175px, calc(46vw - 10px)); }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Запись</title>
+<style>
+body{background:#111;color:#fff;font-family:Arial}
+input,select,button{padding:10px;margin:6px 0;width:320px;max-width:90%;border-radius:8px}
+.row{display:flex;gap:10px}
+</style>
 </head>
 <body>
 
-<h2>Запись на приём</h2>
+<h3>Запись</h3>
 
-<label>Мастер:</label><br>
-<select id="master">
-  <option value="">Выберите мастера</option>
-</select><br><br>
+<label>Мастер</label><br>
+<select id="master"></select><br>
 
-<label>Дата:</label><br>
-<input type="date" id="date"><br><br>
+<label>Дата</label><br>
+<input type="date" id="date"><br>
 
-<label>Время:</label><br>
-<select id="time">
-  <option value="">Сначала выберите мастера и дату</option>
-</select><br><br>
+<label>Время</label><br>
+<select id="time"><option>Сначала мастер + дата</option></select><br>
 
-<label>Имя:</label><br>
-<input id="name"><br><br>
+<label>Имя</label><br>
+<input id="name"><br>
 
-<label>Телефон:</label><br>
-<input id="phone" placeholder="+7700..."><br><br>
+<label>Телефон</label><br>
+<input id="phone" placeholder="+7700..."><br>
 
 <div class="row">
-  <button id="btn" type="button">Записаться</button>
-  <button id="btnCancel" type="button">Отменить запись</button>
+<button id="btn">Записаться</button>
+<button id="btnCancel">Отменить</button>
 </div>
 
 <p id="msg"></p>
 
 <script>
-const API = "https://script.google.com/macros/s/AKfycbwSicOz5m6nKOAFuKAj-_k2os9A5Zdi9ZAdxDNFiG3lnBrs1GbTbTfT0XwBpre7cHs/exec";
+const API="ТВОЙ_EXEC_URL";
 
-// ✅ Список мастеров (редактируй тут)
-const MASTERS = ["Ержан", "Айдар", "Алия"];
+const MASTERS=["Ержан","Айдар","Алия"];
+const TIMES=["09:00","09:30","10:00","10:30","11:00","11:30","12:00","14:00","14:30","15:00","15:30","16:00","16:30","17:00"];
 
-const TIMES = [
-  "09:00","09:30","10:00","10:30",
-  "11:00","11:30","12:00","12:30",
-  "14:00","14:30","15:00","15:30",
-  "16:00","16:30","17:00"
-];
+const masterEl=document.getElementById("master");
+const dateEl=document.getElementById("date");
+const timeEl=document.getElementById("time");
+const nameEl=document.getElementById("name");
+const phoneEl=document.getElementById("phone");
+const msgEl=document.getElementById("msg");
+const btn=document.getElementById("btn");
+const btnCancel=document.getElementById("btnCancel");
 
-const masterEl = document.getElementById("master");
-const dateEl = document.getElementById("date");
-const timeEl = document.getElementById("time");
-const nameEl = document.getElementById("name");
-const phoneEl = document.getElementById("phone");
-const msgEl  = document.getElementById("msg");
-const btnEl  = document.getElementById("btn");
-const btnCancelEl = document.getElementById("btnCancel");
-
-// Заполняем выпадающий список мастеров
-(function initMasters(){
-  MASTERS.forEach(m => {
-    const o = document.createElement("option");
-    o.value = m;
-    o.textContent = m;
-    masterEl.appendChild(o);
-  });
-})();
-
-// 0=вс, 6=сб
-function isWeekend(yyyy_mm_dd){
-  const d = new Date(yyyy_mm_dd + "T00:00:00");
-  const day = d.getDay();
-  return day === 0 || day === 6;
-}
-
-masterEl.addEventListener("change", () => {
-  // при смене мастера — обновим время, если дата уже выбрана
-  if (dateEl.value) loadTimes();
-  else timeEl.innerHTML = "<option value=''>Сначала выберите мастера и дату</option>";
+MASTERS.forEach(m=>{
+ let o=document.createElement("option");
+ o.value=o.textContent=m;
+ masterEl.appendChild(o);
 });
 
-dateEl.addEventListener("change", () => {
-  if (!dateEl.value) return;
+function normPhone(v){return String(v||"").replace(/[^\d]/g,"");}
+function weekend(d){return[0,6].includes(new Date(d+"T00").getDay());}
 
-  if (isWeekend(dateEl.value)) {
-    msgEl.textContent = "Выходной день. Выберите будний день.";
-    dateEl.value = "";
-    timeEl.innerHTML = "<option value=''>Сначала выберите мастера и дату</option>";
-    return;
-  }
+masterEl.onchange=dateEl.onchange=loadTimes;
 
-  loadTimes();
-});
-
-btnEl.addEventListener("click", book);
-btnCancelEl.addEventListener("click", cancelBooking);
-
-function resetTimeHint(){
-  timeEl.innerHTML = "<option value=''>Сначала выберите мастера и дату</option>";
+function loadTimes(){
+ if(!masterEl.value||!dateEl.value){timeEl.innerHTML="<option>Сначала мастер + дата</option>";return;}
+ if(weekend(dateEl.value)){msgEl.textContent="Выходной";return;}
+ fetch(`${API}?action=busy&date=${dateEl.value}&master=${encodeURIComponent(masterEl.value)}`)
+ .then(r=>r.json()).then(j=>{
+  timeEl.innerHTML="";
+  TIMES.forEach(t=>{if(!j.busy.includes(t)){let o=document.createElement("option");o.value=o.textContent=t;timeEl.appendChild(o);}});
+ });
 }
 
-function loadTimes() {
-  const master = masterEl.value;
-  const date = dateEl.value;
-  msgEl.textContent = "";
+btn.onclick=async()=>{
+ const m=masterEl.value,d=dateEl.value,t=timeEl.value,n=nameEl.value.trim(),p=normPhone(phoneEl.value);
+ if(!m||!d||!t||!n||!p){msgEl.textContent="Заполните всё";return;}
+ let r=await fetch(`${API}?action=book&date=${d}&time=${t}&name=${encodeURIComponent(n)}&phone=${p}&master=${encodeURIComponent(m)}`);
+ let j=await r.json();
+ msgEl.textContent=j.ok?"✅ Записано":"⛔ Занято";
+ loadTimes();
+};
 
-  if (!master || !date) { resetTimeHint(); return; }
-
-  if (isWeekend(date)) {
-    msgEl.textContent = "Выходной день. Выберите будний день.";
-    dateEl.value = "";
-    resetTimeHint();
-    return;
-  }
-
-  timeEl.innerHTML = "<option>Загрузка...</option>";
-
-  fetch(`${API}?action=busy&date=${encodeURIComponent(date)}&master=${encodeURIComponent(master)}`)
-    .then(r => r.text())
-    .then(txt => JSON.parse(txt))
-    .then(data => {
-      const busy = (data.busy || []).map(x => String(x).trim());
-      timeEl.innerHTML = "";
-
-      TIMES.forEach(t => {
-        if (!busy.includes(t)) {
-          const o = document.createElement("option");
-          o.value = t;
-          o.textContent = t;
-          timeEl.appendChild(o);
-        }
-      });
-
-      if (!timeEl.options.length) {
-        timeEl.innerHTML = "<option value=''>Нет свободного времени</option>";
-      }
-    })
-    .catch(() => {
-      timeEl.innerHTML = "<option value=''>Ошибка загрузки</option>";
-    });
-}
-
-async function fetchWithTimeout(url, ms = 12000){
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
-  try{
-    const r = await fetch(url, { signal: controller.signal });
-    const txt = await r.text();
-    return { ok: r.ok, status: r.status, txt };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function normalizePhoneDigits(raw){
-  return String(raw || "").trim().replace(/[^\d]/g, "");
-}
-
-async function book() {
-  const master = masterEl.value;
-  const date = dateEl.value;
-  const time = timeEl.value;
-  const name = nameEl.value.trim();
-  const phone = normalizePhoneDigits(phoneEl.value);
-
-  if (!master) { msgEl.textContent = "Выберите мастера."; return; }
-  if (!date) { msgEl.textContent = "Выберите дату."; return; }
-  if (isWeekend(date)) { msgEl.textContent = "Выходной день. Выберите будний день."; return; }
-  if (!time) { msgEl.textContent = "Выберите время."; return; }
-  if (!name) { msgEl.textContent = "Введите имя."; return; }
-  if (!phone) { msgEl.textContent = "Введите телефон."; return; }
-
-  btnEl.disabled = true;
-  btnCancelEl.disabled = true;
-  msgEl.textContent = "Записываю...";
-
-  const url =
-    API +
-    "?action=book" +
-    "&date=" + encodeURIComponent(date) +
-    "&time=" + encodeURIComponent(time) +
-    "&name=" + encodeURIComponent(name) +
-    "&phone=" + encodeURIComponent(phone) +
-    "&master=" + encodeURIComponent(master);
-
-  try{
-    const { status, txt } = await fetchWithTimeout(url, 12000);
-
-    let res;
-    try { res = JSON.parse(txt); }
-    catch {
-      msgEl.textContent = "❌ Сервер вернул не-JSON (status " + status + "): " + txt.slice(0, 120);
-      return;
-    }
-
-    if (res.ok) {
-      msgEl.textContent = "✅ Запись сохранена";
-      loadTimes();
-    } else if (res.error === "SLOT_BUSY") {
-      msgEl.textContent = "⛔ Это время у мастера уже занято";
-      loadTimes();
-    } else {
-      msgEl.textContent = "❌ Ошибка: " + (res.error || "UNKNOWN");
-    }
-
-  } catch(e){
-    msgEl.textContent = (e.name === "AbortError")
-      ? "⏳ Сервер долго отвечает (таймаут). Проверь Apps Script."
-      : "❌ Ошибка связи: " + e.message;
-  } finally {
-    btnEl.disabled = false;
-    btnCancelEl.disabled = false;
-  }
-}
-
-async function cancelBooking() {
-  const date = dateEl.value;
-  const phone = normalizePhoneDigits(phoneEl.value);
-
-  if (!date) { msgEl.textContent = "Выберите дату."; return; }
-  if (isWeekend(date)) { msgEl.textContent = "Выходной день. Выберите будний день."; return; }
-  if (!phone) { msgEl.textContent = "Введите телефон."; return; }
-
-  if (!confirm(`Отменить запись на ${date} для телефона ${phone}?`)) return;
-
-  btnEl.disabled = true;
-  btnCancelEl.disabled = true;
-  msgEl.textContent = "Отменяю запись...";
-
-  const url =
-    API +
-    "?action=cancel" +
-    "&date=" + encodeURIComponent(date) +
-    "&phone=" + encodeURIComponent(phone);
-
-  try{
-    const { status, txt } = await fetchWithTimeout(url, 12000);
-
-    let res;
-    try { res = JSON.parse(txt); }
-    catch {
-      msgEl.textContent = "❌ Сервер вернул не-JSON (status " + status + "): " + txt.slice(0, 120);
-      return;
-    }
-
-    if (res.ok) {
-      msgEl.textContent = "✅ Запись отменена";
-      // если мастер+дата выбраны — обновим слоты по выбранному мастеру
-      if (masterEl.value && dateEl.value) loadTimes();
-    } else if (res.error === "NOT_FOUND") {
-      msgEl.textContent = "⛔ Запись не найдена (проверь дату и телефон)";
-      if (masterEl.value && dateEl.value) loadTimes();
-    } else {
-      msgEl.textContent = "❌ Ошибка: " + (res.error || "UNKNOWN");
-    }
-
-  } catch(e){
-    msgEl.textContent = (e.name === "AbortError")
-      ? "⏳ Сервер долго отвечает (таймаут). Проверь Apps Script."
-      : "❌ Ошибка связи: " + e.message;
-  } finally {
-    btnEl.disabled = false;
-    btnCancelEl.disabled = false;
-  }
-}
+btnCancel.onclick=async()=>{
+ const m=masterEl.value,d=dateEl.value,p=normPhone(phoneEl.value);
+ if(!m||!d||!p){msgEl.textContent="Выберите мастера, дату и телефон";return;}
+ let r=await fetch(`${API}?action=cancel&date=${d}&phone=${p}&master=${encodeURIComponent(m)}`);
+ let j=await r.json();
+ msgEl.textContent=j.ok?"❌ Отменено":"Не найдено";
+ loadTimes();
+};
 </script>
-
 </body>
 </html>
